@@ -19,3 +19,6 @@ primary_region = "dfw"
 
 [env]
   NODE_ENV = "production"
+  # Must match [http_service] internal_port. Fly proxy connects here; listen on all interfaces.
+  PORT = "3000"
+  HOST = "0.0.0.0"

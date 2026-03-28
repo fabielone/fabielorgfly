@@ -5,10 +5,22 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  type MiddlewareFunction,
 } from "react-router";
 
 import type { Route } from "./+types/root";
+import { redirectResponseIfFlyDevHost } from "~/lib/fly-dev-redirect.server";
 import "./app.css";
+
+export const middleware: MiddlewareFunction[] = [
+  async ({ request }, next) => {
+    const redirectResponse = redirectResponseIfFlyDevHost(request);
+    if (redirectResponse) {
+      return redirectResponse;
+    }
+    return next();
+  },
+];
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
