@@ -6,9 +6,19 @@ export function parseJobRoleFilter(searchParams: URLSearchParams, availableRoles
   return availableRoles.includes(r) ? r : "all";
 }
 
-export function buildJobsSearch(role: string): string {
-  if (!role || role === "all") return "";
-  return `?role=${encodeURIComponent(role)}`;
+export type JobsListQuery = {
+  role?: string;
+  showHidden?: boolean;
+  viewSaved?: boolean;
+};
+
+export function buildJobsQuery(filters: JobsListQuery): string {
+  const sp = new URLSearchParams();
+  if (filters.role && filters.role !== "all") sp.set("role", filters.role);
+  if (filters.showHidden) sp.set("showHidden", "1");
+  if (filters.viewSaved) sp.set("view", "saved");
+  const q = sp.toString();
+  return q ? `?${q}` : "";
 }
 
 export function collectJobRoleTypes(jobs: { role_type: string | null }[]): string[] {

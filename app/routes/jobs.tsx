@@ -4,7 +4,7 @@ import type { Route } from "./+types/jobs";
 import { DEMO_JOBS, type DemoJob } from "~/lib/demo-jobs";
 import { MonthPromotionPricing } from "~/components/MonthPromotionPricing";
 import { CompensationLine, JobSkillsList, RemoteDetailLine } from "~/lib/job-display";
-import { buildJobsSearch, collectJobRoleTypes, filterJobsByRole, parseJobRoleFilter } from "~/lib/job-filters";
+import { buildJobsQuery, collectJobRoleTypes, filterJobsByRole, parseJobRoleFilter } from "~/lib/job-filters";
 import { normalizeJobSkills } from "~/lib/job-skills";
 import { newSubscriberMonthlyMxn } from "~/lib/pricing";
 import { getActivePayingSubscriptionCount } from "~/lib/subscription-count.server";
@@ -98,6 +98,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const promoMonthlyMxn = newSubscriberMonthlyMxn(activePayingCount);
   const { supabase } = createSupabaseServerClient(request);
   const showHidden = url.searchParams.get("showHidden") === "1";
+  const viewSaved = url.searchParams.get("view") === "saved";
 
   let allJobs: JobRow[];
   let fromDatabase: boolean;
@@ -144,6 +145,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     }
   }
 
+  if (viewSaved && !userId) {
+    return redirect("/sign-in");
+  }
+
   const roleTypes = collectJobRoleTypes(allJobs);
   const role = parseJobRoleFilter(url.searchParams, roleTypes);
   let jobs = filterJobsByRole(allJobs, role);
@@ -151,11 +156,15 @@ export async function loader({ request }: Route.LoaderArgs) {
     jobs = jobs.filter((j) => preferenceMap[String(j.id)] !== "hidden");
   }
 
+  if (userId && viewSaved) {
+    jobs = jobs.filter((j) => preferenceMap[String(j.id)] === "saved");
+  }
+
   return {
     jobs,
     allJobsCount: allJobs.length,
     roleTypes,
-    filters: { role, showHidden },
+    filters: { role, showHidden, viewSaved },
     fromDatabase,
     promoMonthlyMxn,
     preferenceMap,
@@ -176,16 +185,31 @@ function formatRoleLabel(role: string) {
   return role.charAt(0).toUpperCase() + role.slice(1);
 }
 
-function JobFilterBar({ roleTypes, activeRole }: { roleTypes: string[]; activeRole: string }) {
+function JobFilterBar({
+  roleTypes,
+  activeRole,
+  filters,
+}: {
+  roleTypes: string[];
+  activeRole: string;
+  filters: { showHidden: boolean; viewSaved: boolean };
+}) {
   return (
     <div className="mt-8 rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900/40">
       <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Filter by role</p>
       <div className="mt-3 flex flex-wrap gap-2">
-        <Link to="/jobs" className={roleFilterPillClass(activeRole === "all")}>
+        <Link
+          to={`/jobs${buildJobsQuery({ role: "all", showHidden: filters.showHidden, viewSaved: filters.viewSaved })}`}
+          className={roleFilterPillClass(activeRole === "all")}
+        >
           All roles
         </Link>
         {roleTypes.map((r) => (
-          <Link key={r} to={`/jobs${buildJobsSearch(r)}`} className={roleFilterPillClass(activeRole === r)}>
+          <Link
+            key={r}
+            to={`/jobs${buildJobsQuery({ role: r, showHidden: filters.showHidden, viewSaved: filters.viewSaved })}`}
+            className={roleFilterPillClass(activeRole === r)}
+          >
             {formatRoleLabel(r)}
           </Link>
         ))}
@@ -199,7 +223,11 @@ export default function Jobs({ loaderData }: Route.ComponentProps) {
     loaderData;
   const filteredCount = jobs.length;
   const isFiltered = filters.role !== "all";
-  const redirectTo = `/jobs${filters.showHidden ? "?showHidden=1" : ""}`;
+  const redirectTo = `/jobs${buildJobsQuery({
+    role: filters.role,
+    showHidden: filters.showHidden,
+    viewSaved: filters.viewSaved,
+  })}`;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
@@ -239,13 +267,34 @@ export default function Jobs({ loaderData }: Route.ComponentProps) {
       </aside>
 
       {isLoggedIn && (
-        <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-zinc-600 dark:text-zinc-400">
+          {filters.viewSaved ? (
+            <Link
+              to={`/jobs${buildJobsQuery({ role: filters.role, showHidden: filters.showHidden, viewSaved: false })}`}
+              className="font-medium text-emerald-700 underline dark:text-emerald-400"
+            >
+              Show all jobs
+            </Link>
+          ) : (
+            <Link
+              to={`/jobs${buildJobsQuery({ role: filters.role, showHidden: filters.showHidden, viewSaved: true })}`}
+              className="font-medium text-emerald-700 underline dark:text-emerald-400"
+            >
+              Saved jobs only
+            </Link>
+          )}
           {filters.showHidden ? (
-            <Link to="/jobs" className="font-medium text-emerald-700 underline dark:text-emerald-400">
+            <Link
+              to={`/jobs${buildJobsQuery({ role: filters.role, showHidden: false, viewSaved: filters.viewSaved })}`}
+              className="font-medium text-emerald-700 underline dark:text-emerald-400"
+            >
               Hide hidden jobs
             </Link>
           ) : (
-            <Link to="/jobs?showHidden=1" className="font-medium text-emerald-700 underline dark:text-emerald-400">
+            <Link
+              to={`/jobs${buildJobsQuery({ role: filters.role, showHidden: true, viewSaved: filters.viewSaved })}`}
+              className="font-medium text-emerald-700 underline dark:text-emerald-400"
+            >
               Show hidden jobs
             </Link>
           )}
@@ -259,7 +308,13 @@ export default function Jobs({ loaderData }: Route.ComponentProps) {
         </p>
       )}
 
-      {roleTypes.length > 0 && <JobFilterBar roleTypes={roleTypes} activeRole={filters.role} />}
+      {roleTypes.length > 0 && (
+        <JobFilterBar roleTypes={roleTypes} activeRole={filters.role} filters={filters} />
+      )}
+
+      {isLoggedIn && filters.viewSaved && (
+        <p className="mt-4 text-sm font-medium text-zinc-700 dark:text-zinc-300">Showing saved jobs only.</p>
+      )}
 
       {isFiltered && (
         <p className="mt-6 text-sm text-zinc-600 dark:text-zinc-400">
@@ -272,10 +327,24 @@ export default function Jobs({ loaderData }: Route.ComponentProps) {
 
       {filteredCount === 0 ? (
         <p className="mt-10 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-6 py-12 text-center text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-400">
-          No jobs for this role right now.{" "}
-          <Link to="/jobs" className="font-medium text-emerald-700 underline dark:text-emerald-400">
-            Show all roles
-          </Link>
+          {filters.viewSaved ? (
+            <>
+              You have not saved any jobs yet.{" "}
+              <Link
+                to={`/jobs${buildJobsQuery({ role: filters.role, showHidden: filters.showHidden, viewSaved: false })}`}
+                className="font-medium text-emerald-700 underline dark:text-emerald-400"
+              >
+                Browse all jobs
+              </Link>
+            </>
+          ) : (
+            <>
+              No jobs for this role right now.{" "}
+              <Link to="/jobs" className="font-medium text-emerald-700 underline dark:text-emerald-400">
+                Show all roles
+              </Link>
+            </>
+          )}
         </p>
       ) : (
       <ul className="mt-8 space-y-4">

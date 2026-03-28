@@ -143,7 +143,10 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
         Keep this updated so we can match you to better opportunities and referrals.
       </p>
 
-      <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900/40">
+      <div
+        id="profile"
+        className="mt-6 scroll-mt-24 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900/40"
+      >
         <p className="text-xs uppercase tracking-wide text-zinc-500">Logged in as</p>
         <p className="mt-1 font-medium">{email}</p>
       </div>
@@ -159,7 +162,12 @@ export default function Account({ loaderData, actionData }: Route.ComponentProps
         </p>
       )}
 
-      <Form method="post" encType="multipart/form-data" className="mt-8 space-y-5">
+      <Form
+        id="settings"
+        method="post"
+        encType="multipart/form-data"
+        className="mt-8 scroll-mt-24 space-y-5"
+      >
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="text-sm">
             <span className="font-medium">Display name</span>
