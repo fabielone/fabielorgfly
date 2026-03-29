@@ -53,11 +53,17 @@ export async function loader({ request }: Route.LoaderArgs) {
     }
   }
 
+  const mercadoPagoSandbox =
+    process.env.MERCADOPAGO_SANDBOX === "1" ||
+    process.env.MERCADOPAGO_SANDBOX === "true" ||
+    process.env.MERCADOPAGO_SANDBOX === "yes";
+
   return data(
     {
       activePayingCount,
       nextSignupPriceMxn,
       mercadoPagoReady: Boolean(process.env.MERCADOPAGO_ACCESS_TOKEN?.trim()),
+      mercadoPagoSandbox,
       user,
       hasActiveAccess: blocksNewCheckout(userSubscription),
       checkoutReturn,
@@ -132,6 +138,7 @@ export default function Subscribe({ loaderData }: Route.ComponentProps) {
     activePayingCount,
     nextSignupPriceMxn,
     mercadoPagoReady,
+    mercadoPagoSandbox,
     user,
     hasActiveAccess,
     checkoutReturn,
@@ -180,6 +187,26 @@ export default function Subscribe({ loaderData }: Route.ComponentProps) {
           </Link>
           .
         </p>
+      )}
+
+      {mercadoPagoReady && mercadoPagoSandbox && (
+        <aside
+          className="mt-8 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-100"
+          role="note"
+        >
+          <p className="font-semibold">Test mode (sandbox)</p>
+          <p className="mt-2">
+            Mercado Pago requires the <strong>seller</strong> (your integration, test access token) and the{" "}
+            <strong>payer</strong> (who logs in on the checkout page) to be the same kind of user: both{" "}
+            <strong>test</strong> or both <strong>production</strong>.
+          </p>
+          <p className="mt-2">
+            Create <strong>buyer</strong> and <strong>seller</strong> test users in{" "}
+            <span className="font-medium">Tu aplicación → Cuentas de prueba</span>, use the{" "}
+            <strong>test access token</strong> in this app, set <code className="rounded bg-sky-100 px-1 text-xs dark:bg-sky-900/80">MERCADOPAGO_SANDBOX=true</code>, and complete checkout by logging into Mercado Pago as the{" "}
+            <strong>test buyer</strong> (not your real account).
+          </p>
+        </aside>
       )}
 
       {actionError && (

@@ -56,7 +56,13 @@ export async function createMercadoPagoSubscriptionCheckout(params: {
     });
 
     const row = res as { sandbox_init_point?: string; init_point?: string };
-    const initPoint = row.sandbox_init_point ?? row.init_point;
+    const sandbox =
+      process.env.MERCADOPAGO_SANDBOX === "1" ||
+      process.env.MERCADOPAGO_SANDBOX === "true" ||
+      process.env.MERCADOPAGO_SANDBOX === "yes";
+    const initPoint = sandbox
+      ? (row.sandbox_init_point ?? row.init_point)
+      : (row.init_point ?? row.sandbox_init_point);
     if (!initPoint) {
       return { error: "Mercado Pago did not return a checkout URL." };
     }
