@@ -1,6 +1,7 @@
 import { redirect } from "react-router";
 
 import type { Route } from "./+types/auth.callback";
+import { readOAuthReturnPathAndClearCookie } from "~/lib/oauth-return-path.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -17,5 +18,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     return redirect(`/sign-in?error=${encodeURIComponent(error.message)}`, { headers });
   }
 
-  return redirect("/account", { headers });
+  const { nextPath, clearCookie } = readOAuthReturnPathAndClearCookie(request);
+  const out = new Headers(headers);
+  out.append("Set-Cookie", clearCookie);
+  return redirect(nextPath, { headers: out });
 }

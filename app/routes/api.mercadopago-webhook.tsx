@@ -1,10 +1,15 @@
 import type { Route } from "./+types/api.mercadopago-webhook";
+import { processMercadoPagoWebhook } from "~/lib/mercadopago-webhook.server";
 import { createSupabaseServiceClient } from "~/lib/supabase.server";
 
+export function loader() {
+  return new Response(null, { status: 405 });
+}
+
 /**
- * Mercado Pago sends subscription / payment events here.
- * Verify signatures with Mercado Pago's SDK or raw HMAC using MERCADOPAGO_WEBHOOK_SECRET.
- * Map events → rows in `subscriptions` (status, grace_period_ends_at, locked_monthly_mxn, etc.).
+ * POST https://fabiel.org/api/webhooks/mercadopago
+ * Configure the same URL in Mercado Pago (test + production) with your webhook secret.
+ * Set checkout `external_reference` to the Supabase `auth.users` id (UUID) so rows sync.
  */
 export async function action({ request }: Route.ActionArgs) {
   if (request.method !== "POST") {
@@ -16,11 +21,9 @@ export async function action({ request }: Route.ActionArgs) {
     return new Response("Webhook not configured", { status: 503 });
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return new Response("Invalid JSON", { status: 400 });
+  const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+  if (!accessToken) {
+    return new Response("Mercado Pago access token not configured", { status: 503 });
   }
 
   const admin = createSupabaseServiceClient();
@@ -28,13 +31,24 @@ export async function action({ request }: Route.ActionArgs) {
     return new Response("Database not configured", { status: 503 });
   }
 
-  // TODO: verify Mercado Pago signature headers against raw body.
-  // TODO: parse subscription id + state; update Supabase:
-  //   - active → status 'active', clear grace_period_ends_at
-  //   - payment failed → status 'past_due', grace_period_ends_at = now + 10 days
-  //   - canceled → status 'canceled'
+  const rawBody = await request.text();
 
-  console.info("[mercadopago webhook] received (stub)", JSON.stringify(body).slice(0, 500));
+  try {
+    const result = await processMercadoPagoWebhook({
+      request,
+      rawBody,
+      secret,
+      accessToken,
+      admin,
+    });
 
-  return Response.json({ ok: true });
+    if (!result.ok) {
+      return new Response(result.message, { status: result.status });
+    }
+
+    return Response.json({ ok: true, detail: result.detail });
+  } catch (e) {
+    console.error("[mercadopago webhook]", e);
+    return new Response("Webhook handler error", { status: 500 });
+  }
 }

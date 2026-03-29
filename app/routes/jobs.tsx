@@ -235,11 +235,6 @@ export default function Jobs({ loaderData }: Route.ComponentProps) {
         Remote-first · curated
       </p>
       <h1 className="mt-2 text-3xl font-bold tracking-tight">Remote job board</h1>
-      <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-        Every role here is <strong>remote</strong> (or remote-first by design). We include <strong>compensation</strong>{" "}
-        when the posting or our notes have it; otherwise we mark it so you know to confirm with the employer.
-        Listings use referral links — guests complete a short form per role; signed-in members go straight through.
-      </p>
 
       <aside
         className="mt-8 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100"
@@ -301,12 +296,7 @@ export default function Jobs({ loaderData }: Route.ComponentProps) {
         </p>
       )}
 
-      {!fromDatabase && (
-        <p className="mt-4 text-xs text-zinc-500">
-          Showing sample listings. Add rows to the <code className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">jobs</code>{" "}
-          table in Supabase to replace these.
-        </p>
-      )}
+  
 
       {roleTypes.length > 0 && (
         <JobFilterBar roleTypes={roleTypes} activeRole={filters.role} filters={filters} />

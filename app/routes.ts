@@ -9,6 +9,7 @@ export default [
     route("account", "routes/account.tsx"),
     route("courses", "routes/courses.tsx"),
     route("courses/:slug", "routes/courses.$slug.tsx"),
+    route("schedule", "routes/schedule.tsx"),
     route("subscribe", "routes/subscribe.tsx"),
     route("privacy", "routes/privacy.tsx"),
     route("terms", "routes/terms.tsx"),

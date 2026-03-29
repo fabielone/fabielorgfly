@@ -3,6 +3,7 @@ import { data, Form, Link, redirect } from "react-router";
 import type { Route } from "./+types/sign-in";
 import { MonthPromotionPricing } from "~/components/MonthPromotionPricing";
 import { newSubscriberMonthlyMxn } from "~/lib/pricing";
+import { appendOAuthReturnCookie, safeOAuthReturnPath } from "~/lib/oauth-return-path.server";
 import { getActivePayingSubscriptionCount } from "~/lib/subscription-count.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 
@@ -13,16 +14,24 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request }: Route.LoaderArgs) {
   const activePayingCount = await getActivePayingSubscriptionCount();
   const { supabase, headers } = createSupabaseServerClient(request);
+  const returnTo = safeOAuthReturnPath(new URL(request.url).searchParams.get("redirectTo"));
 
   if (supabase) {
     const { data: auth } = await supabase.auth.getUser();
     if (auth.user) {
-      return redirect("/account", { headers });
+      return redirect(returnTo, { headers });
     }
   }
 
   const error = new URL(request.url).searchParams.get("error");
-  return data({ promoMonthlyMxn: newSubscriberMonthlyMxn(activePayingCount), oauthError: error }, { headers });
+  return data(
+    {
+      promoMonthlyMxn: newSubscriberMonthlyMxn(activePayingCount),
+      oauthError: error,
+      oauthReturnPath: returnTo,
+    },
+    { headers },
+  );
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -41,6 +50,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "oauth-google" || intent === "oauth-github") {
     const provider = intent === "oauth-google" ? "google" : "github";
+    const returnPath = safeOAuthReturnPath(String(formData.get("redirectTo") ?? ""));
     const { data: oauthData, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo: `${origin}/auth/callback` },
@@ -50,7 +60,9 @@ export async function action({ request }: Route.ActionArgs) {
       return data({ error: error?.message ?? "Could not start OAuth login.", ok: false }, { status: 400, headers });
     }
 
-    return redirect(oauthData.url, { headers });
+    const out = new Headers(headers);
+    appendOAuthReturnCookie(out, returnPath);
+    return redirect(oauthData.url, { headers: out });
   }
 
   const email = String(formData.get("email") ?? "").trim();
@@ -60,11 +72,12 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (intent === "login") {
+    const returnPath = safeOAuthReturnPath(String(formData.get("redirectTo") ?? ""));
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       return data({ error: error.message, ok: false }, { status: 400, headers });
     }
-    return redirect("/account", { headers });
+    return redirect(returnPath, { headers });
   }
 
   if (intent === "signup") {
@@ -97,7 +110,7 @@ export default function SignIn({ loaderData, actionData }: Route.ComponentProps)
     (actionData && "error" in actionData && actionData.error) ||
     (loaderData.oauthError ? decodeURIComponent(loaderData.oauthError) : null);
   const msg = actionData && "message" in actionData ? actionData.message : null;
-  const { promoMonthlyMxn } = loaderData;
+  const { promoMonthlyMxn, oauthReturnPath } = loaderData;
 
   return (
     <div className="mx-auto max-w-md px-4 py-16">
@@ -124,6 +137,7 @@ export default function SignIn({ loaderData, actionData }: Route.ComponentProps)
       <div className="mt-8 grid gap-3 sm:grid-cols-2">
         <Form method="post">
           <input type="hidden" name="intent" value="oauth-google" />
+          <input type="hidden" name="redirectTo" value={oauthReturnPath} />
           <button
             type="submit"
             className="w-full rounded-lg border border-zinc-300 bg-white py-2.5 text-sm font-semibold text-zinc-800 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
@@ -133,6 +147,7 @@ export default function SignIn({ loaderData, actionData }: Route.ComponentProps)
         </Form>
         <Form method="post">
           <input type="hidden" name="intent" value="oauth-github" />
+          <input type="hidden" name="redirectTo" value={oauthReturnPath} />
           <button
             type="submit"
             className="w-full rounded-lg border border-zinc-300 bg-white py-2.5 text-sm font-semibold text-zinc-800 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
@@ -149,6 +164,7 @@ export default function SignIn({ loaderData, actionData }: Route.ComponentProps)
       </div>
 
       <Form method="post" className="space-y-4">
+        <input type="hidden" name="redirectTo" value={oauthReturnPath} />
         <div>
           <label htmlFor="email" className="block text-sm font-medium">
             Email

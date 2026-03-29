@@ -53,6 +53,9 @@ export function SiteHeader({ user }: { user: User | null }) {
                 <NavLink to="/courses" className={primaryNavLinkClass}>
                   Courses
                 </NavLink>
+                <NavLink to="/schedule" className={primaryNavLinkClass}>
+                  Schedule
+                </NavLink>
                 <NavLink to="/subscribe" className={primaryNavLinkClass}>
                   Subscribe
                 </NavLink>
