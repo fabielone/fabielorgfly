@@ -6,24 +6,11 @@ import { createMercadoPagoSubscriptionCheckout } from "~/lib/mercadopago-checkou
 import { getPublicOrigin } from "~/lib/public-origin.server";
 import { newSubscriberMonthlyMxn, STANDARD_LIST_PRICE_MXN } from "~/lib/pricing";
 import { getActivePayingSubscriptionCount } from "~/lib/subscription-count.server";
+import { hasActiveSubscriberAccess, type SubscriptionAccessRow } from "~/lib/subscription-access.server";
 import { createSupabaseServerClient, createSupabaseServiceClient } from "~/lib/supabase.server";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Subscription — Fabielorg" }];
-}
-
-type SubRow = {
-  status: string;
-  grace_period_ends_at: string | null;
-};
-
-function blocksNewCheckout(sub: SubRow | null): boolean {
-  if (!sub) return false;
-  if (sub.status === "active") return true;
-  if (sub.status === "past_due" && sub.grace_period_ends_at) {
-    return new Date(sub.grace_period_ends_at) > new Date();
-  }
-  return false;
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -34,7 +21,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const { supabase, headers } = createSupabaseServerClient(request);
   let user: { id: string; email?: string | null } | null = null;
-  let userSubscription: SubRow | null = null;
+  let userSubscription: SubscriptionAccessRow | null = null;
 
   if (supabase) {
     const { data: auth } = await supabase.auth.getUser();
@@ -48,7 +35,7 @@ export async function loader({ request }: Route.LoaderArgs) {
           .select("status, grace_period_ends_at")
           .eq("user_id", u.id)
           .maybeSingle();
-        if (data) userSubscription = data as SubRow;
+        if (data) userSubscription = data as SubscriptionAccessRow;
       }
     }
   }
@@ -57,6 +44,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     process.env.MERCADOPAGO_SANDBOX === "1" ||
     process.env.MERCADOPAGO_SANDBOX === "true" ||
     process.env.MERCADOPAGO_SANDBOX === "yes";
+  const mercadoPagoSandboxPayerEmailSet = Boolean(process.env.MERCADOPAGO_SANDBOX_PAYER_EMAIL?.trim());
 
   return data(
     {
@@ -64,8 +52,9 @@ export async function loader({ request }: Route.LoaderArgs) {
       nextSignupPriceMxn,
       mercadoPagoReady: Boolean(process.env.MERCADOPAGO_ACCESS_TOKEN?.trim()),
       mercadoPagoSandbox,
+      mercadoPagoSandboxPayerEmailSet,
       user,
-      hasActiveAccess: blocksNewCheckout(userSubscription),
+      hasActiveAccess: hasActiveSubscriberAccess(userSubscription),
       checkoutReturn,
     },
     { headers },
@@ -90,7 +79,12 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   const email = user.email?.trim() ?? "";
-  if (!email) {
+  const sandbox =
+    process.env.MERCADOPAGO_SANDBOX === "1" ||
+    process.env.MERCADOPAGO_SANDBOX === "true" ||
+    process.env.MERCADOPAGO_SANDBOX === "yes";
+  const sandboxPayerEmail = process.env.MERCADOPAGO_SANDBOX_PAYER_EMAIL?.trim();
+  if (!email && !(sandbox && sandboxPayerEmail)) {
     return data(
       { error: "Add an email to your account (e.g. re-link GitHub with email) before subscribing." },
       { status: 400, headers },
@@ -108,7 +102,7 @@ export async function action({ request }: Route.ActionArgs) {
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (blocksNewCheckout(subRow as SubRow | null)) {
+  if (hasActiveSubscriberAccess(subRow as SubscriptionAccessRow | null)) {
     return data({ error: "You already have an active subscription or are in a grace period." }, { status: 400, headers });
   }
 
@@ -139,6 +133,7 @@ export default function Subscribe({ loaderData }: Route.ComponentProps) {
     nextSignupPriceMxn,
     mercadoPagoReady,
     mercadoPagoSandbox,
+    mercadoPagoSandboxPayerEmailSet,
     user,
     hasActiveAccess,
     checkoutReturn,
@@ -196,15 +191,25 @@ export default function Subscribe({ loaderData }: Route.ComponentProps) {
         >
           <p className="font-semibold">Test mode (sandbox)</p>
           <p className="mt-2">
-            Mercado Pago requires the <strong>seller</strong> (your integration, test access token) and the{" "}
-            <strong>payer</strong> (who logs in on the checkout page) to be the same kind of user: both{" "}
-            <strong>test</strong> or both <strong>production</strong>.
+            Use the <strong>test access token</strong> and <code className="rounded bg-sky-100 px-1 text-xs dark:bg-sky-900/80">MERCADOPAGO_SANDBOX=true</code>. The{" "}
+            <strong>public key is not used</strong> for this server-side checkout (only the access token).
           </p>
           <p className="mt-2">
-            Create <strong>buyer</strong> and <strong>seller</strong> test users in{" "}
-            <span className="font-medium">Tu aplicación → Cuentas de prueba</span>, use the{" "}
-            <strong>test access token</strong> in this app, set <code className="rounded bg-sky-100 px-1 text-xs dark:bg-sky-900/80">MERCADOPAGO_SANDBOX=true</code>, and complete checkout by logging into Mercado Pago as the{" "}
-            <strong>test buyer</strong> (not your real account).
+            If you see <strong>“Both payer and collector must be real or test users”</strong> as soon as you click
+            pay, Mercado Pago is rejecting the API call because <code className="rounded bg-sky-100 px-1 text-xs dark:bg-sky-900/80">payer_email</code> is often tied to a{" "}
+            <strong>production</strong> account. Set{" "}
+            <code className="rounded bg-sky-100 px-1 text-xs dark:bg-sky-900/80">MERCADOPAGO_SANDBOX_PAYER_EMAIL</code>{" "}
+            in <code className="font-mono text-xs">.env</code> to the <strong>test buyer (comprador) email</strong> from{" "}
+            <span className="font-medium">Cuentas de prueba</span> (the email MP shows for that user — not your personal Gmail).
+            {!mercadoPagoSandboxPayerEmailSet ? (
+              <span className="block pt-2 font-medium text-sky-900 dark:text-sky-50">
+                You have not set MERCADOPAGO_SANDBOX_PAYER_EMAIL yet — add it and restart the dev server.
+              </span>
+            ) : null}
+          </p>
+          <p className="mt-2">
+            On Mercado Pago’s page, still log in or pay as a <strong>test</strong> user / test card — not your real MP
+            account.
           </p>
         </aside>
       )}

@@ -1,5 +1,23 @@
 import { MercadoPagoConfig, PreApproval } from "mercadopago";
 
+function isMercadoPagoSandboxEnv(): boolean {
+  return (
+    process.env.MERCADOPAGO_SANDBOX === "1" ||
+    process.env.MERCADOPAGO_SANDBOX === "true" ||
+    process.env.MERCADOPAGO_SANDBOX === "yes"
+  );
+}
+
+/**
+ * In sandbox, MP often rejects `POST /preapproval` if `payer_email` is tied to a *production* MP user.
+ * Set MERCADOPAGO_SANDBOX_PAYER_EMAIL to the **test buyer (comprador)** email from Cuentas de prueba.
+ */
+export function resolvePayerEmailForMercadoPago(loggedInUserEmail: string): string {
+  const override = process.env.MERCADOPAGO_SANDBOX_PAYER_EMAIL?.trim();
+  if (isMercadoPagoSandboxEnv() && override) return override;
+  return loggedInUserEmail.trim();
+}
+
 function mercadoPagoErrorMessage(error: unknown): string {
   if (error && typeof error === "object") {
     const o = error as Record<string, unknown>;
@@ -28,8 +46,12 @@ export async function createMercadoPagoSubscriptionCheckout(params: {
   monthlyAmountMxn: number;
   backUrl: string;
 }): Promise<{ initPoint: string } | { error: string }> {
-  if (!params.payerEmail.trim()) {
-    return { error: "Your account needs an email to bill with Mercado Pago." };
+  const payerEmail = resolvePayerEmailForMercadoPago(params.payerEmail);
+  if (!payerEmail) {
+    return {
+      error:
+        "Missing payer email. Add an email to your Fabielorg account, or set MERCADOPAGO_SANDBOX_PAYER_EMAIL for sandbox.",
+    };
   }
   if (!Number.isFinite(params.monthlyAmountMxn) || params.monthlyAmountMxn <= 0) {
     return { error: "Invalid subscription amount." };
@@ -43,7 +65,7 @@ export async function createMercadoPagoSubscriptionCheckout(params: {
       body: {
         reason: "Fabielorg monthly membership",
         external_reference: params.userId,
-        payer_email: params.payerEmail.trim(),
+        payer_email: payerEmail,
         auto_recurring: {
           frequency: 1,
           frequency_type: "months",
@@ -56,10 +78,7 @@ export async function createMercadoPagoSubscriptionCheckout(params: {
     });
 
     const row = res as { sandbox_init_point?: string; init_point?: string };
-    const sandbox =
-      process.env.MERCADOPAGO_SANDBOX === "1" ||
-      process.env.MERCADOPAGO_SANDBOX === "true" ||
-      process.env.MERCADOPAGO_SANDBOX === "yes";
+    const sandbox = isMercadoPagoSandboxEnv();
     const initPoint = sandbox
       ? (row.sandbox_init_point ?? row.init_point)
       : (row.init_point ?? row.sandbox_init_point);

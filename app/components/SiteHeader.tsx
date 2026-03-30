@@ -17,11 +17,15 @@ const authLinkClass = ({ isActive }: { isActive: boolean }) =>
       : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
   }`;
 
-export function SiteHeader({ user }: { user: User | null }) {
+export function SiteHeader({ user, showSubscribeNav }: { user: User | null; showSubscribeNav: boolean }) {
   return (
     <header className="border-b border-zinc-200 bg-white/80 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
-        <Link to="/" className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+        <Link
+          to="/"
+          className="text-lg font-semibold tracking-tight text-zinc-900 transition-opacity hover:opacity-80 dark:text-zinc-50"
+          aria-label="Home"
+        >
           Fabielorg
         </Link>
         {user ? (
@@ -44,9 +48,6 @@ export function SiteHeader({ user }: { user: User | null }) {
             <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-white to-transparent dark:from-zinc-950" />
             <nav className="hide-scrollbar overflow-x-auto">
               <div className="flex min-w-max items-center gap-2 pr-2">
-                <NavLink to="/" className={primaryNavLinkClass} end>
-                  Home
-                </NavLink>
                 <NavLink to="/jobs" className={primaryNavLinkClass}>
                   Remote jobs
                 </NavLink>
@@ -56,9 +57,11 @@ export function SiteHeader({ user }: { user: User | null }) {
                 <NavLink to="/schedule" className={primaryNavLinkClass}>
                   Schedule
                 </NavLink>
-                <NavLink to="/subscribe" className={primaryNavLinkClass}>
-                  Subscribe
-                </NavLink>
+                {showSubscribeNav ? (
+                  <NavLink to="/subscribe" className={primaryNavLinkClass}>
+                    Subscribe
+                  </NavLink>
+                ) : null}
               </div>
             </nav>
           </div>
