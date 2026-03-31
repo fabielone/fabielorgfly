@@ -1,13 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { assertCvFileAllowed, cvEffectiveMimeType } from "~/lib/cv-constraints";
 import { createSupabaseServiceClient } from "~/lib/supabase.server";
-
-const MAX_BYTES = 5 * 1024 * 1024;
-const ALLOWED_TYPES = new Set([
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-]);
 
 function sanitizeFilename(name: string): string {
   const base = name.replace(/^.*[/\\]/, "").slice(0, 120);
@@ -15,31 +9,13 @@ function sanitizeFilename(name: string): string {
   return cleaned || "cv.pdf";
 }
 
-/** Some browsers omit `type` on file inputs; infer from extension. */
-function effectiveMimeType(file: File): string {
-  if (file.type) return file.type;
-  const lower = file.name.toLowerCase();
-  if (lower.endsWith(".pdf")) return "application/pdf";
-  if (lower.endsWith(".docx")) {
-    return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-  }
-  if (lower.endsWith(".doc")) return "application/msword";
-  return "";
-}
-
 export async function uploadApplicationCv(
   jobId: string,
   file: File,
 ): Promise<{ ok: true; path: string; originalName: string } | { ok: false; error: string }> {
-  if (file.size === 0) {
-    return { ok: false, error: "CV file is empty." };
-  }
-  if (file.size > MAX_BYTES) {
-    return { ok: false, error: "CV must be 5 MB or smaller." };
-  }
-  const mime = effectiveMimeType(file);
-  if (!ALLOWED_TYPES.has(mime)) {
-    return { ok: false, error: "CV must be a PDF or Word document (.doc, .docx)." };
+  const validationError = assertCvFileAllowed(file);
+  if (validationError) {
+    return { ok: false, error: validationError };
   }
 
   const admin = createSupabaseServiceClient();
@@ -47,6 +23,7 @@ export async function uploadApplicationCv(
     return { ok: false, error: "File upload is not configured (missing service role key)." };
   }
 
+  const mime = cvEffectiveMimeType(file);
   const safe = sanitizeFilename(file.name);
   const path = `${jobId}/${randomUUID()}-${safe}`;
   const body = await file.arrayBuffer();

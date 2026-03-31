@@ -22,3 +22,30 @@ body {
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+@keyframes nav-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+.animate-nav-progress {
+  animation: nav-progress 0.9s ease-in-out infinite;
+}
+
+.tap-scale:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-nav-progress {
+    animation: none;
+  }
+
+  .tap-scale:active:not(:disabled) {
+    transform: none;
+  }
+}

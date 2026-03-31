@@ -9,6 +9,7 @@ import {
 } from "react-router";
 
 import type { Route } from "./+types/root";
+import { CookieConsentRoot } from "~/components/CookieConsentRoot";
 import { redirectResponseIfFlyDevHost } from "~/lib/fly-dev-redirect.server";
 import "./app.css";
 
@@ -46,6 +47,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
+        <CookieConsentRoot />
         <ScrollRestoration />
         <Scripts />
       </body>

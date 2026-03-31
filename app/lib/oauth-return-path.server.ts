@@ -1,13 +1,25 @@
 const COOKIE_NAME = "fabiel_oauth_next";
 const MAX_AGE_SEC = 600;
 
-/** Only same-origin paths; default `/account`. */
+const DUMMY_ORIGIN = "https://fabiel.local";
+
+/**
+ * Same-origin relative paths only (optional query and hash). Used after OAuth and for post-login redirects.
+ * Default `/jobs` when missing or unsafe.
+ */
 export function safeOAuthReturnPath(raw: string | null | undefined): string {
-  if (!raw || typeof raw !== "string") return "/account";
+  const fallback = "/jobs";
+  if (!raw || typeof raw !== "string") return fallback;
   const t = raw.trim();
-  if (!t.startsWith("/") || t.startsWith("//")) return "/account";
-  if (t.includes("?") || t.includes("#")) return "/account";
-  return t;
+  if (!t.startsWith("/") || t.startsWith("//")) return fallback;
+  try {
+    const u = new URL(t, DUMMY_ORIGIN);
+    if (u.origin !== DUMMY_ORIGIN) return fallback;
+    if (u.pathname.includes("..")) return fallback;
+    return u.pathname + u.search + u.hash;
+  } catch {
+    return fallback;
+  }
 }
 
 export function appendOAuthReturnCookie(headers: Headers, path: string): void {
@@ -22,12 +34,12 @@ export function readOAuthReturnPathAndClearCookie(request: Request): { nextPath:
   const cookie = request.headers.get("Cookie") ?? "";
   const re = new RegExp(`(?:^|;\\s*)${COOKIE_NAME}=([^;]*)`);
   const m = cookie.match(re);
-  let next = "/account";
+  let next = "/jobs";
   if (m?.[1]) {
     try {
       next = safeOAuthReturnPath(decodeURIComponent(m[1]));
     } catch {
-      next = "/account";
+      next = "/jobs";
     }
   }
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";

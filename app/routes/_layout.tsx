@@ -1,8 +1,8 @@
 import { data, Link, Outlet, useRouteLoaderData } from "react-router";
 
 import type { Route } from "./+types/_layout";
+import { NavigationProgress } from "~/components/NavigationProgress";
 import { SiteHeader } from "~/components/SiteHeader";
-import { hasActiveSubscriberAccess } from "~/lib/subscription-access.server";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -12,29 +12,16 @@ export async function loader({ request }: Route.LoaderArgs) {
     const { data: auth } = await supabase.auth.getUser();
     user = auth.user ?? null;
   }
-
-  let showSubscribeNav = true;
-  if (supabase && user) {
-    const { data: sub } = await supabase
-      .from("subscriptions")
-      .select("status, grace_period_ends_at")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    showSubscribeNav = !hasActiveSubscriberAccess(sub);
-  }
-
-  return data({ user, showSubscribeNav }, { headers });
+  return data({ user }, { headers });
 }
 
 export default function SiteLayout() {
-  const { user, showSubscribeNav } = useRouteLoaderData("site") as {
-    user: import("@supabase/supabase-js").User | null;
-    showSubscribeNav: boolean;
-  };
+  const { user } = useRouteLoaderData("site") as { user: import("@supabase/supabase-js").User | null };
 
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
-      <SiteHeader user={user} showSubscribeNav={showSubscribeNav} />
+      <NavigationProgress />
+      <SiteHeader user={user} />
       <main className="flex-1">
         <Outlet />
       </main>
@@ -42,10 +29,18 @@ export default function SiteLayout() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 sm:flex-row">
           <p>Copyright {new Date().getFullYear()} fabiel.org. All rights reserved.</p>
           <div className="flex items-center gap-4">
-            <Link to="/privacy" className="hover:text-zinc-700 hover:underline dark:hover:text-zinc-200">
+            <Link
+              to="/privacy"
+              prefetch="intent"
+              className="tap-scale hover:text-zinc-700 hover:underline dark:hover:text-zinc-200"
+            >
               Privacy
             </Link>
-            <Link to="/terms" className="hover:text-zinc-700 hover:underline dark:hover:text-zinc-200">
+            <Link
+              to="/terms"
+              prefetch="intent"
+              className="tap-scale hover:text-zinc-700 hover:underline dark:hover:text-zinc-200"
+            >
               Terms and Conditions
             </Link>
           </div>

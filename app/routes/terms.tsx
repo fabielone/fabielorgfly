@@ -9,7 +9,7 @@ export default function Terms() {
     <div className="mx-auto max-w-3xl px-4 py-16">
       <h1 className="text-3xl font-bold tracking-tight">Terms and Conditions</h1>
       <p className="mt-4 text-zinc-600 dark:text-zinc-400">
-        By using this platform, you agree to our subscription terms, acceptable use, and application process.
+        By using this platform, you agree to our terms of service, acceptable use, and application process.
         This page is a placeholder and should be replaced with your final legal text.
       </p>
     </div>

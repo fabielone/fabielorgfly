@@ -62,18 +62,27 @@ export function UserAccountMenu({ user }: { user: User }) {
           id={`${menuId}-menu`}
           role="menu"
           aria-labelledby={menuId}
-          className="absolute right-0 z-50 mt-2 w-52 rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+          className="absolute right-0 z-50 mt-2 w-52 rounded-xl border border-zinc-200 bg-white py-1 dark:border-zinc-700 dark:bg-zinc-900"
         >
-          <Link to="/account#profile" role="menuitem" className={itemClass} onClick={() => setOpen(false)}>
+          <Link
+            to="/account#profile"
+            prefetch="intent"
+            role="menuitem"
+            className={itemClass}
+            onClick={() => setOpen(false)}
+          >
             Profile
           </Link>
-          <Link to="/jobs?view=saved" role="menuitem" className={itemClass} onClick={() => setOpen(false)}>
-            Saved jobs
-          </Link>
-          <Link to="/jobs?showHidden=1" role="menuitem" className={itemClass} onClick={() => setOpen(false)}>
+          <Link
+            to="/jobs?showHidden=1"
+            prefetch="intent"
+            role="menuitem"
+            className={itemClass}
+            onClick={() => setOpen(false)}
+          >
             Hidden jobs
           </Link>
-          <Link to="/account#settings" role="menuitem" className={itemClass} onClick={() => setOpen(false)}>
+          <Link to="/settings" prefetch="intent" role="menuitem" className={itemClass} onClick={() => setOpen(false)}>
             Settings
           </Link>
           <div className="my-1 border-t border-zinc-200 dark:border-zinc-700" role="separator" />
